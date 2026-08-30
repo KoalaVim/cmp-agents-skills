@@ -123,8 +123,6 @@ function source:complete(params, callback)
 	end
 	local pattern = before:sub(trigger_pos + #trigger)
 
-	print(string.format('[cmp-agents-skills] pattern=%q, skills=%d', pattern, #self.skill_names))
-
 	if #self.skill_names == 0 then
 		callback({ items = {}, isIncomplete = false })
 		return
@@ -157,7 +155,6 @@ function source:complete(params, callback)
 		end
 
 		local matches = matcher:filter(pattern, self.skill_names, self.opts.fuzzy_extra_arg)
-		print(string.format('[cmp-agents-skills] matches: %d', #matches))
 
 		local completions = {}
 		local set = {}
