@@ -88,8 +88,12 @@ function source:_scan()
 	end
 end
 
+function source.get_trigger_characters()
+	return { '/' }
+end
+
 function source.get_keyword_pattern()
-	return [[\k\+]]
+	return [[/\zs\k\+]]
 end
 
 function source:complete(params, callback)
