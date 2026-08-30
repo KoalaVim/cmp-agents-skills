@@ -35,10 +35,31 @@ local function parse_frontmatter(content)
 		return nil, nil
 	end
 	local name = fm:match('name:%s*(.-)%s*\n')
-	local desc = fm:match('description:%s*["\']?(.-)["\']?%s*\n')
-	if desc then
-		desc = desc:gsub('^["\']', ''):gsub('["\']$', '')
+
+	local desc
+	local desc_first = fm:match('description:%s*(.*)')
+	if desc_first then
+		desc_first = desc_first:gsub('%s+$', '')
+		if desc_first == '>-' or desc_first == '>' or desc_first == '|' or desc_first == '|-' then
+			-- YAML block scalar: collect indented continuation lines
+			local lines = {}
+			local after = fm:match('description:[^\n]*\n(.*)')
+			if after then
+				for line in after:gmatch('[^\n]+') do
+					local indent_content = line:match('^%s%s+(.*)')
+					if indent_content then
+						lines[#lines + 1] = indent_content
+					else
+						break
+					end
+				end
+			end
+			desc = table.concat(lines, ' ')
+		else
+			desc = desc_first:gsub('^["\']', ''):gsub('["\']$', '')
+		end
 	end
+
 	return name, desc
 end
 
