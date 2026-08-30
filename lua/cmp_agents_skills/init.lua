@@ -108,25 +108,57 @@ end
 
 function source:get_keyword_pattern()
 	local t = vim.pesc(self.opts.trigger)
-	return t .. [[\zs[[:keyword:]-]\+]]
+	return t .. [[[[:keyword:]-]*]]
 end
 
 function source:complete(params, callback)
-	local pattern = params.context.cursor_before_line:sub(params.offset)
+	local before = params.context.cursor_before_line
+	local trigger = self.opts.trigger
 
-	vim.notify(string.format('[cmp-agents-skills] complete: pattern=%q, offset=%d, cursor_before=%q, skills=%d',
-		pattern, params.offset, params.context.cursor_before_line, #self.skill_names), vim.log.levels.WARN)
+	-- Find the last trigger character and extract everything after it
+	local trigger_pos = before:find(trigger .. '[%w_-]*$')
+	if not trigger_pos then
+		callback({ items = {}, isIncomplete = false })
+		return
+	end
+	local pattern = before:sub(trigger_pos + #trigger)
+
+	print(string.format('[cmp-agents-skills] pattern=%q, skills=%d', pattern, #self.skill_names))
 
 	if #self.skill_names == 0 then
-		vim.notify('[cmp-agents-skills] no skills loaded', vim.log.levels.WARN)
 		callback({ items = {}, isIncomplete = false })
 		return
 	end
 
 	vim.schedule(function()
 		local matcher = backends.get(self.opts.fuzzy_backend)
+		local items
+
+		if #pattern == 0 then
+			-- No filter yet, return all skills
+			items = {}
+			for i, name in ipairs(self.skill_names) do
+				if i > self.opts.max_items then break end
+				local skill
+				for _, s in ipairs(self.skills) do
+					if s.name == name then skill = s; break end
+				end
+				items[#items + 1] = {
+					label = trigger .. name,
+					insertText = name,
+					detail = skill and skill.description or nil,
+					filterText = trigger .. name,
+					sortText = name,
+					data = { score = 0, path = skill and skill.path, description = skill and skill.description },
+					dup = 0,
+				}
+			end
+			callback({ items = items, isIncomplete = true })
+			return
+		end
+
 		local matches = matcher:filter(pattern, self.skill_names, self.opts.fuzzy_extra_arg)
-		vim.notify(string.format('[cmp-agents-skills] matches: %d', #matches), vim.log.levels.WARN)
+		print(string.format('[cmp-agents-skills] matches: %d', #matches))
 
 		local completions = {}
 		local set = {}
@@ -142,12 +174,11 @@ function source:complete(params, callback)
 						break
 					end
 				end
-				local trigger = self.opts.trigger
 				table.insert(completions, {
 					label = trigger .. name,
 					insertText = name,
 					detail = skill and skill.description or nil,
-					filterText = pattern,
+					filterText = trigger .. name,
 					sortText = name,
 					data = {
 						score = score,
@@ -166,7 +197,7 @@ function source:complete(params, callback)
 
 		callback({
 			items = completions,
-			isIncomplete = false,
+			isIncomplete = true,
 		})
 	end)
 end
