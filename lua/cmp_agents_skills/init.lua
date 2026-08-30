@@ -34,30 +34,55 @@ local function parse_frontmatter(content)
 	if not fm then
 		return nil, nil
 	end
-	local name = fm:match('name:%s*(.-)%s*\n')
 
+	local fm_lines = {}
+	for line in (fm .. '\n'):gmatch('(.-)\n') do
+		fm_lines[#fm_lines + 1] = line
+	end
+
+	local name
 	local desc
-	local desc_first = fm:match('description:%s*(.*)')
-	if desc_first then
-		desc_first = desc_first:gsub('%s+$', '')
-		if desc_first == '>-' or desc_first == '>' or desc_first == '|' or desc_first == '|-' then
-			-- YAML block scalar: collect indented continuation lines
-			local lines = {}
-			local after = fm:match('description:[^\n]*\n(.*)')
-			if after then
-				for line in after:gmatch('[^\n]+') do
-					local indent_content = line:match('^%s%s+(.*)')
-					if indent_content then
-						lines[#lines + 1] = indent_content
-					else
-						break
+	local i = 1
+	while i <= #fm_lines do
+		local line = fm_lines[i]
+
+		if not name then
+			local n = line:match('^name:%s*(.+)')
+			if n then
+				name = n:gsub('%s+$', '')
+			end
+		end
+
+		if not desc then
+			local d = line:match('^description:%s*(.*)')
+			if d then
+				d = d:gsub('%s+$', '')
+				if d == '>-' or d == '>' or d == '|' or d == '|-' then
+					-- Block scalar: collect indented continuation lines
+					local parts = {}
+					local j = i + 1
+					while j <= #fm_lines do
+						local cont = fm_lines[j]:match('^%s%s(.*)')
+						if cont then
+							parts[#parts + 1] = cont
+							j = j + 1
+						else
+							break
+						end
 					end
+					desc = table.concat(parts, ' ')
+					i = j - 1
+				elseif #d > 0 then
+					desc = d:gsub('^["\']', ''):gsub('["\']$', '')
 				end
 			end
-			desc = table.concat(lines, ' ')
-		else
-			desc = desc_first:gsub('^["\']', ''):gsub('["\']$', '')
 		end
+
+		i = i + 1
+	end
+
+	if desc and #desc == 0 then
+		desc = nil
 	end
 
 	return name, desc
@@ -98,10 +123,6 @@ function source:_scan()
 
 					local name, desc = parse_frontmatter(content)
 					name = name or entry_name
-
-					if desc == '>-' or desc == '>' or desc == '|' or desc == '|-' then
-						desc = nil
-					end
 
 					seen[name] = true
 					self.skills[#self.skills + 1] = {
