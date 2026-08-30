@@ -1,11 +1,18 @@
 local backends = require('fuzzy_nvim.backends')
 
+local home = vim.loop.os_homedir() or os.getenv('HOME') or '~'
+
 local defaults = {
 	dirs = {
 		'.claude/skills',
 		'.agents/skills',
 	},
+	absolute_dirs = {
+		home .. '/.cursor/skills-cursor',
+		home .. '/.cursor/skills',
+	},
 	roots = nil, -- list of root paths to scan, nil = auto-detect via git
+	trigger = '/',
 	fuzzy_backend = nil,
 	max_items = 15,
 	fuzzy_extra_arg = 0,
@@ -50,50 +57,58 @@ function source:_scan()
 		end
 	end
 
-	for _, root in ipairs(roots) do
-		for _, dir in ipairs(self.opts.dirs) do
-			local skills_dir = root .. '/' .. dir
-			local handle = vim.loop.fs_scandir(skills_dir)
-			if handle then
-				while true do
-					local entry_name, entry_type = vim.loop.fs_scandir_next(handle)
-					if not entry_name then
-						break
-					end
-					if entry_type == 'directory' and not seen[entry_name] then
-						local skill_file = skills_dir .. '/' .. entry_name .. '/SKILL.md'
-						local fd = vim.loop.fs_open(skill_file, 'r', 438)
-						if fd then
-							local stat = vim.loop.fs_fstat(fd)
-							local content = vim.loop.fs_read(fd, stat.size, 0)
-							vim.loop.fs_close(fd)
+	local function scan_dir(skills_dir, dir_label)
+		local handle = vim.loop.fs_scandir(skills_dir)
+		if not handle then
+			return
+		end
+		while true do
+			local entry_name, entry_type = vim.loop.fs_scandir_next(handle)
+			if not entry_name then
+				break
+			end
+			if entry_type == 'directory' and not seen[entry_name] then
+				local skill_file = skills_dir .. '/' .. entry_name .. '/SKILL.md'
+				local fd = vim.loop.fs_open(skill_file, 'r', 438)
+				if fd then
+					local stat = vim.loop.fs_fstat(fd)
+					local content = vim.loop.fs_read(fd, stat.size, 0)
+					vim.loop.fs_close(fd)
 
-							local name, desc = parse_frontmatter(content)
-							name = name or entry_name
+					local name, desc = parse_frontmatter(content)
+					name = name or entry_name
 
-							seen[name] = true
-							local skill = {
-								name = name,
-								description = desc or '',
-								path = skill_file,
-								dir = dir,
-							}
-							self.skills[#self.skills + 1] = skill
-							self.skill_names[#self.skill_names + 1] = name
-						end
-					end
+					seen[name] = true
+					self.skills[#self.skills + 1] = {
+						name = name,
+						description = desc or '',
+						path = skill_file,
+						dir = dir_label,
+					}
+					self.skill_names[#self.skill_names + 1] = name
 				end
 			end
 		end
 	end
+
+	for _, root in ipairs(roots) do
+		for _, dir in ipairs(self.opts.dirs) do
+			scan_dir(root .. '/' .. dir, dir)
+		end
+	end
+
+	for _, abs_dir in ipairs(self.opts.absolute_dirs) do
+		scan_dir(abs_dir, abs_dir)
+	end
 end
 
-function source.get_trigger_characters()
-	return { '/' }
+function source:get_trigger_characters()
+	return { self.opts.trigger }
 end
 
-function source.get_keyword_pattern()
-	return [[/\zs\k\+]]
+function source:get_keyword_pattern()
+	local t = vim.pesc(self.opts.trigger)
+	return t .. [[\zs\k\+]]
 end
 
 function source:complete(params, callback)
