@@ -114,7 +114,11 @@ end
 function source:complete(params, callback)
 	local pattern = params.context.cursor_before_line:sub(params.offset)
 
+	vim.notify(string.format('[cmp-agents-skills] complete: pattern=%q, offset=%d, cursor_before=%q, skills=%d',
+		pattern, params.offset, params.context.cursor_before_line, #self.skill_names), vim.log.levels.WARN)
+
 	if #self.skill_names == 0 then
+		vim.notify('[cmp-agents-skills] no skills loaded', vim.log.levels.WARN)
 		callback({ items = {}, isIncomplete = false })
 		return
 	end
@@ -122,6 +126,7 @@ function source:complete(params, callback)
 	vim.schedule(function()
 		local matcher = backends.get(self.opts.fuzzy_backend)
 		local matches = matcher:filter(pattern, self.skill_names, self.opts.fuzzy_extra_arg)
+		vim.notify(string.format('[cmp-agents-skills] matches: %d', #matches), vim.log.levels.WARN)
 
 		local completions = {}
 		local set = {}
