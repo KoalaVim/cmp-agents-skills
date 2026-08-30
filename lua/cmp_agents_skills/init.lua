@@ -199,19 +199,11 @@ end
 
 function source.resolve(_, completion_item, callback)
 	local data = completion_item.data
-	if data and data.path then
-		local fd = vim.loop.fs_open(data.path, 'r', 438)
-		if fd then
-			local stat = vim.loop.fs_fstat(fd)
-			local content = vim.loop.fs_read(fd, stat.size, 0)
-			vim.loop.fs_close(fd)
-
-			local doc = content:match('^%-%-%-\r?\n.-\r?\n%-%-%-\r?\n(.*)') or content
-			completion_item.documentation = {
-				kind = 'markdown',
-				value = doc,
-			}
-		end
+	if data and data.description and #data.description > 0 then
+		completion_item.documentation = {
+			kind = 'markdown',
+			value = data.description,
+		}
 	end
 	callback(completion_item)
 end
