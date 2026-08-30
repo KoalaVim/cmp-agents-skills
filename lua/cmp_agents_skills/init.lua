@@ -108,7 +108,7 @@ end
 
 function source:get_keyword_pattern()
 	local t = vim.pesc(self.opts.trigger)
-	return t .. [[\zs\k\+]]
+	return t .. [[\zs[[:keyword:]-]\+]]
 end
 
 function source:complete(params, callback)
@@ -137,8 +137,10 @@ function source:complete(params, callback)
 						break
 					end
 				end
+				local trigger = self.opts.trigger
 				table.insert(completions, {
-					label = name,
+					label = trigger .. name,
+					insertText = name,
 					detail = skill and skill.description or nil,
 					filterText = pattern,
 					sortText = name,
