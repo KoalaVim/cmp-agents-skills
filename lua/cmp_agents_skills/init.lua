@@ -1,18 +1,18 @@
-local backends = require('fuzzy_nvim.backends')
+local backends = require("fuzzy_nvim.backends")
 
-local home = vim.loop.os_homedir() or os.getenv('HOME') or '~'
+local home = vim.loop.os_homedir() or os.getenv("HOME") or "~"
 
 local defaults = {
 	dirs = {
-		'.claude/skills',
-		'.agents/skills',
+		".claude/skills",
+		".agents/skills",
 	},
 	absolute_dirs = {
-		home .. '/.cursor/skills-cursor',
-		home .. '/.cursor/skills',
+		home .. "/.cursor/skills-cursor",
+		home .. "/.cursor/skills",
 	},
 	roots = nil, -- list of root paths to scan, nil = auto-detect via git
-	trigger = '/',
+	trigger = "/",
 	fuzzy_backend = nil,
 	max_items = 15,
 	fuzzy_extra_arg = 0,
@@ -22,7 +22,7 @@ local source = {}
 
 source.new = function(opts)
 	local self = setmetatable({}, { __index = source })
-	self.opts = vim.tbl_deep_extend('keep', opts or {}, defaults)
+	self.opts = vim.tbl_deep_extend("keep", opts or {}, defaults)
 	self.skills = {} -- { name = string, description = string, path = string }
 	self.skill_names = {} -- flat list for fuzzy matching
 	self:_scan()
@@ -30,13 +30,13 @@ source.new = function(opts)
 end
 
 local function parse_frontmatter(content)
-	local fm = content:match('^%-%-%-\r?\n(.-)\r?\n%-%-%-')
+	local fm = content:match("^%-%-%-\r?\n(.-)\r?\n%-%-%-")
 	if not fm then
 		return nil, nil
 	end
 
 	local fm_lines = {}
-	for line in (fm .. '\n'):gmatch('(.-)\n') do
+	for line in (fm .. "\n"):gmatch("(.-)\n") do
 		fm_lines[#fm_lines + 1] = line
 	end
 
@@ -47,22 +47,22 @@ local function parse_frontmatter(content)
 		local line = fm_lines[i]
 
 		if not name then
-			local n = line:match('^name:%s*(.+)')
+			local n = line:match("^name:%s*(.+)")
 			if n then
-				name = n:gsub('%s+$', '')
+				name = n:gsub("%s+$", "")
 			end
 		end
 
 		if not desc then
-			local d = line:match('^description:%s*(.*)')
+			local d = line:match("^description:%s*(.*)")
 			if d then
-				d = d:gsub('%s+$', '')
-				if d == '>-' or d == '>' or d == '|' or d == '|-' then
+				d = d:gsub("%s+$", "")
+				if d == ">-" or d == ">" or d == "|" or d == "|-" then
 					-- Block scalar: collect indented continuation lines
 					local parts = {}
 					local j = i + 1
 					while j <= #fm_lines do
-						local cont = fm_lines[j]:match('^%s%s(.*)')
+						local cont = fm_lines[j]:match("^%s%s(.*)")
 						if cont then
 							parts[#parts + 1] = cont
 							j = j + 1
@@ -70,10 +70,10 @@ local function parse_frontmatter(content)
 							break
 						end
 					end
-					desc = table.concat(parts, ' ')
+					desc = table.concat(parts, " ")
 					i = j - 1
 				elseif #d > 0 then
-					desc = d:gsub('^["\']', ''):gsub('["\']$', '')
+					desc = d:gsub("^[\"']", ""):gsub("[\"']$", "")
 				end
 			end
 		end
@@ -95,7 +95,7 @@ function source:_scan()
 
 	local roots = self.opts.roots
 	if not roots then
-		local git_root = vim.fn.systemlist('git rev-parse --show-toplevel')[1]
+		local git_root = vim.fn.systemlist("git rev-parse --show-toplevel")[1]
 		if vim.v.shell_error == 0 and git_root and #git_root > 0 then
 			roots = { git_root }
 		else
@@ -113,9 +113,9 @@ function source:_scan()
 			if not entry_name then
 				break
 			end
-			if entry_type == 'directory' and not seen[entry_name] then
-				local skill_file = skills_dir .. '/' .. entry_name .. '/SKILL.md'
-				local fd = vim.loop.fs_open(skill_file, 'r', 438)
+			if entry_type == "directory" and not seen[entry_name] then
+				local skill_file = skills_dir .. "/" .. entry_name .. "/SKILL.md"
+				local fd = vim.loop.fs_open(skill_file, "r", 438)
 				if fd then
 					local stat = vim.loop.fs_fstat(fd)
 					local content = vim.loop.fs_read(fd, stat.size, 0)
@@ -127,7 +127,7 @@ function source:_scan()
 					seen[name] = true
 					self.skills[#self.skills + 1] = {
 						name = name,
-						description = desc or '',
+						description = desc or "",
 						path = skill_file,
 						dir = dir_label,
 					}
@@ -139,7 +139,7 @@ function source:_scan()
 
 	for _, root in ipairs(roots) do
 		for _, dir in ipairs(self.opts.dirs) do
-			scan_dir(root .. '/' .. dir, dir)
+			scan_dir(root .. "/" .. dir, dir)
 		end
 	end
 
@@ -161,9 +161,8 @@ function source:complete(params, callback)
 	local before = params.context.cursor_before_line
 	local trigger = self.opts.trigger
 
-	-- Find the last trigger character and extract everything after it
-	local trigger_pos = before:find(trigger .. '[%w_-]*$')
-	if not trigger_pos then
+	local trigger_pos = before:find(vim.pesc(trigger) .. "[%w_-]*$")
+	if not trigger_pos or (trigger_pos > 1 and not before:sub(trigger_pos - 1, trigger_pos - 1):match("%s")) then
 		callback({ items = {}, isIncomplete = false })
 		return
 	end
@@ -182,10 +181,15 @@ function source:complete(params, callback)
 			-- No filter yet, return all skills
 			items = {}
 			for i, name in ipairs(self.skill_names) do
-				if i > self.opts.max_items then break end
+				if i > self.opts.max_items then
+					break
+				end
 				local skill
 				for _, s in ipairs(self.skills) do
-					if s.name == name then skill = s; break end
+					if s.name == name then
+						skill = s
+						break
+					end
 				end
 				items[#items + 1] = {
 					label = trigger .. name,
@@ -247,7 +251,7 @@ function source.resolve(_, completion_item, callback)
 	local data = completion_item.data
 	if data and data.description and #data.description > 0 then
 		completion_item.documentation = {
-			kind = 'markdown',
+			kind = "markdown",
 			value = data.description,
 		}
 	end
@@ -255,7 +259,7 @@ function source.resolve(_, completion_item, callback)
 end
 
 source.rescan = function(self, opts)
-	self.opts = vim.tbl_deep_extend('force', self.opts, opts or {})
+	self.opts = vim.tbl_deep_extend("force", self.opts, opts or {})
 	self:_scan()
 end
 
