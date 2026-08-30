@@ -145,7 +145,6 @@ function source:complete(params, callback)
 				end
 				items[#items + 1] = {
 					label = trigger .. name,
-					insertText = name,
 					detail = skill and skill.description or nil,
 					filterText = trigger .. name,
 					sortText = name,
@@ -176,7 +175,6 @@ function source:complete(params, callback)
 				end
 				table.insert(completions, {
 					label = trigger .. name,
-					insertText = name,
 					detail = skill and skill.description or nil,
 					filterText = trigger .. name,
 					sortText = name,
