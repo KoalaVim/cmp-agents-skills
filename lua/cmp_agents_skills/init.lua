@@ -99,6 +99,10 @@ function source:_scan()
 					local name, desc = parse_frontmatter(content)
 					name = name or entry_name
 
+					if desc == '>-' or desc == '>' or desc == '|' or desc == '|-' then
+						desc = nil
+					end
+
 					seen[name] = true
 					self.skills[#self.skills + 1] = {
 						name = name,
